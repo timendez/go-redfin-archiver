@@ -21,7 +21,7 @@ func main() {
 }
 
 func extractAddress(htmlText string) string {
-	addressPatternWithTitle := `<title>([0-9A-Za-z\s]+),`
+	addressPatternWithTitle := `<title>([0-9A-Za-z\s#.]+),`
 	regex := regexp.MustCompile(addressPatternWithTitle)
 	matches := regex.FindStringSubmatch(htmlText)
 	if len(matches) <= 0 {

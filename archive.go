@@ -8,32 +8,35 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 )
 
 func main() {
 	redfinUrl := os.Args[1]
 	htmlText := extractHTML(redfinUrl)
-	mlsString := extractMLSString(htmlText)
+	address := extractAddress(htmlText)
 	imageUrlPrefix := extractImageURLPrefix(htmlText)
-	outputDir := createDir(mlsString)
+	outputDir := createDir(address)
 	downloadImages(imageUrlPrefix, outputDir)
 }
 
-func extractMLSString(htmlText string) string {
-	println(htmlText)
-	mlsPattern := `MLS#\ \w+`
-	regex := regexp.MustCompile(mlsPattern)
+func extractAddress(htmlText string) string {
+	addressPatternWithTitle := `<title>([0-9A-Za-z\s]+),`
+	regex := regexp.MustCompile(addressPatternWithTitle)
 	matches := regex.FindStringSubmatch(htmlText)
 	if len(matches) <= 0 {
-		log.Fatal("Can't find MLS number in HTML, please open a github issue https://github.com/timendez/go-redfin-archiver/issues/new and provide the Redfin URL.")
+		log.Fatal("Can't find address in HTML, please open a github issue https://github.com/timendez/go-redfin-archiver/issues/new and provide the Redfin URL.")
 	}
 
-	// The first match for `ML{numbers}` in the HTML is our MLS listing number
-	return matches[0]
+	// Strip <title> tag from address match
+	addressWithoutTitleTag := strings.Replace(matches[0], "<title>", "", 1)
+
+	// Drop trailing comma
+	return addressWithoutTitleTag[:len(addressWithoutTitleTag)-1]
 }
 
 func extractImageURLPrefix(htmlText string) string {
-	bigPhotoCDNPattern := `https://ssl\.cdn-redfin\.com/photo/\d+/bigphoto/\w+/\w+_0\.jpg`
+	bigPhotoCDNPattern := `https://ssl\.cdn-redfin\.com/photo/\d+/bigphoto/\w+/[0-9A-Za-z]+`
 	regex := regexp.MustCompile(bigPhotoCDNPattern)
 	matches := regex.FindStringSubmatch(htmlText)
 	if len(matches) <= 0 {
@@ -103,6 +106,7 @@ func downloadImages(imageUrlPrefix string, outputDir string) {
 			}
 			return fmt.Sprintf("_%d", idx)
 		}()
+		// TODO Tim handle older listings like https://www.redfin.com/CA/Morgan-Hill/10868-Dougherty-Ave-95037/home/807367
 		url := fmt.Sprintf("%s%s_0.jpg", imageUrlPrefix, indexedString)
 		fileName := fmt.Sprintf("%s/image%d.jpg", outputDir, idx)
 		err := downloadFile(url, fileName)

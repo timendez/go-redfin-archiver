@@ -12,3 +12,6 @@ From this directory:
 ### Build & Run
 1. `go build`
 2. `./go-redfin-archiver.exe https://www.redfin.com/CA/Morgan-Hill/10868-Dougherty-Ave-95037/home/807367`
+
+## Demo
+![Demo download](./demo.gif)

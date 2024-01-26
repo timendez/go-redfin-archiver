@@ -1,5 +1,5 @@
 # Go Redfin Archiver
-Tool to download a Redfin listing. Currently downloads images into a directory `./archives`
+Tool to download a Redfin listing. Currently, downloads listing images into a directory `./archives`.
 
 ## Prerequisites
 1. [Go 1.21.4+](https://go.dev/doc/install)
@@ -9,11 +9,16 @@ You can either follow the Quick Run section to compile and run in the same step,
 
 ### Quick Run
 From this directory:
-1. `go run https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534`
+1. `go run archive.go https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534`
 
 ### Build & Run
 1. `go build`
 2. `./go-redfin-archiver.exe https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534`
+
+### With Debug Mode
+Debug mode creates a 
+1. `go run archive.go https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534 debug`
+2. `./go-redfin-archiver.exe https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534 debug`
 
 ## Demo
 ![Demo download](./demo.gif)

@@ -16,7 +16,7 @@ From this directory:
 2. `./go-redfin-archiver.exe https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534`
 
 ### With Debug Mode
-Debug mode creates a 
+Debug mode creates a `go-redfin-archiver.log` file, and spits out debug info to `stdout`.
 1. `go run archive.go https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534 debug`
 2. `./go-redfin-archiver.exe https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534 debug`
 

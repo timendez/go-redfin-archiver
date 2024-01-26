@@ -8,16 +8,37 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
+var debugModeEnabled = false
+
 func main() {
+	configureLogging()
 	redfinUrl := os.Args[1]
 	htmlText := extractHTML(redfinUrl)
 	address := extractAddress(htmlText)
-	imageUrlPrefix := extractImageURLPrefix(htmlText)
+	imageUrlPrefix, imageUrlSuffix := extractImageURLPrefixAndSuffix(htmlText)
 	outputDir := createDir(address)
-	downloadImages(imageUrlPrefix, outputDir)
+	downloadImages(imageUrlPrefix, imageUrlSuffix, outputDir)
+}
+
+func configureLogging() {
+	// Third arg is debug mode
+	debugModeEnabled = len(os.Args) > 2
+
+	// Open a log file for writing. Create the file if it doesn't exist.
+	file, err := os.OpenFile("go-redfin-archiver.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create a MultiWriter that writes logs to both the file and the standard output.
+	multiWriter := io.MultiWriter(file, os.Stdout)
+
+	// Set the log output to the MultiWriter
+	log.SetOutput(multiWriter)
 }
 
 func extractAddress(htmlText string) string {
@@ -28,23 +49,35 @@ func extractAddress(htmlText string) string {
 		log.Fatal("Can't find address in HTML, please open a github issue https://github.com/timendez/go-redfin-archiver/issues/new and provide the Redfin URL.")
 	}
 
+	if debugModeEnabled {
+		log.Println("matches[0] = " + matches[0])
+	}
+
 	// Strip <title> tag from address match
 	addressWithoutTitleTag := strings.Replace(matches[0], "<title>", "", 1)
+	if debugModeEnabled {
+		log.Println("addressWithoutTitleTag = " + addressWithoutTitleTag)
+	}
 
 	// Drop trailing comma
 	return addressWithoutTitleTag[:len(addressWithoutTitleTag)-1]
 }
 
-func extractImageURLPrefix(htmlText string) string {
-	bigPhotoCDNPattern := `https://ssl\.cdn-redfin\.com/photo/\d+/bigphoto/\w+/[0-9A-Za-z]+`
-	regex := regexp.MustCompile(bigPhotoCDNPattern)
-	matches := regex.FindStringSubmatch(htmlText)
-	if len(matches) <= 0 {
-		log.Fatal("Can't find big photo CDN pattern in HTML, please open a github issue https://github.com/timendez/go-redfin-archiver/issues/new and provide the Redfin URL.")
+func extractImageURLPrefixAndSuffix(htmlText string) (string, string) {
+	bigPhotoCDNPrefixPattern := `https://ssl\.cdn-redfin\.com/photo/\d+/bigphoto/\w+/[0-9A-Za-z]+`
+	bigPhotoCDNSuffixPattern := `_\d.jpg` // Can't guarantee only 1 number, so best to be safe and use a regex rather than indexing on a fully matched CDN URL.
+	prefixRegex := regexp.MustCompile(bigPhotoCDNPrefixPattern)
+	suffixRegex := regexp.MustCompile(bigPhotoCDNSuffixPattern)
+	prefixMatches := prefixRegex.FindStringSubmatch(htmlText) // The first match in the HTML here is our main image's prefix, minus `_0.jpg` or `_1.jpg` on the end of the string
+	suffixMatches := suffixRegex.FindStringSubmatch(htmlText) // The first match in the HTML here is our main image's suffix, like `_0.jpg` or `_1.jpg` from the end of the string
+	if len(prefixMatches) <= 0 {
+		log.Fatal("Can't find big photo prefix CDN pattern in HTML, please open a github issue https://github.com/timendez/go-redfin-archiver/issues/new and provide the Redfin URL.")
+	}
+	if len(suffixMatches) <= 0 {
+		log.Fatal("Can't find big photo suffix CDN pattern in HTML, please open a github issue https://github.com/timendez/go-redfin-archiver/issues/new and provide the Redfin URL.")
 	}
 
-	// The first match in the HTML here is our main image, minus `_0.jpg` on the end of the string
-	return matches[0]
+	return prefixMatches[0], suffixMatches[0]
 }
 
 func createDir(redfinUrl string) string {
@@ -53,10 +86,19 @@ func createDir(redfinUrl string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if debugModeEnabled {
+		log.Println("Directory created for " + outputDir)
+	}
 	return outputDir
 }
 
 func extractHTML(redfinUrl string) string {
+	if debugModeEnabled {
+		println("hello")
+		log.Printf("Redfin URL = %s\n", redfinUrl)
+		println("RedfinUrl = " + redfinUrl)
+	}
+
 	// Set up request
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", redfinUrl, nil)
@@ -94,11 +136,42 @@ func extractHTML(redfinUrl string) string {
 		log.Fatal(err)
 	}
 
-	return string(htmlText)
+	htmlString := string(htmlText)
+	if debugModeEnabled {
+		log.Println(htmlString)
+	}
+
+	return htmlString
 }
 
-func downloadImages(imageUrlPrefix string, outputDir string) {
+/**
+ * Redfin likes to sometimes go from https://ssl.cdn-redfin.com/photo/69/bigphoto/499/OC22362195_2_1.jpg to
+ * https://ssl.cdn-redfin.com/photo/69/bigphoto/499/OC22362195_3_2.jpg
+ * Note that the 2nd to last digit keeps incrementing as well.
+ * I don't know why.
+ * @param imageUrlSuffix looks like `_1.jpg`
+ */
+func incrementImageSuffix(imageUrlSuffix string) string {
+	regex := regexp.MustCompile(`\d+`) // Just yoink the number
+	matches := regex.FindStringSubmatch(imageUrlSuffix)
+	if len(matches) <= 0 {
+		log.Println("Can't increment imageUrlSuffix of " + imageUrlSuffix)
+	}
+
+	imageSuffixNumber, err := strconv.Atoi(matches[0])
+	if err != nil {
+		log.Println(err)
+	}
+
+	// Increment and restringify to `_2.jpg`
+	return fmt.Sprintf("_%d.jpg", imageSuffixNumber+1)
+}
+
+func downloadImages(imageUrlPrefix string, imageUrlSuffix string, outputDir string) {
 	idx := 0
+	attemptedToIncrementImageSuffix := false
+	attemptedToIncrementMiddleNumber := false
+
 	for {
 		indexedString := func() string {
 			if idx == 0 {
@@ -106,14 +179,34 @@ func downloadImages(imageUrlPrefix string, outputDir string) {
 			}
 			return fmt.Sprintf("_%d", idx)
 		}()
-		// TODO Tim handle older listings like https://www.redfin.com/CA/Morgan-Hill/10868-Dougherty-Ave-95037/home/807367
-		url := fmt.Sprintf("%s%s_0.jpg", imageUrlPrefix, indexedString)
+		url := fmt.Sprintf("%s%s%s", imageUrlPrefix, indexedString, imageUrlSuffix)
+		if debugModeEnabled {
+			log.Println("Downloading image of URL " + url)
+		}
+
 		fileName := fmt.Sprintf("%s/image%d.jpg", outputDir, idx)
 		err := downloadFile(url, fileName)
 		if err != nil {
-			break
+			if !attemptedToIncrementImageSuffix {
+				imageUrlSuffix = incrementImageSuffix(imageUrlSuffix) // Overwrite imageUrlSuffix
+				attemptedToIncrementImageSuffix = true
+			} else if !attemptedToIncrementMiddleNumber {
+				idx++
+				attemptedToIncrementMiddleNumber = true
+			} else {
+				// We've counted up in both directions and still failed to find images, probably exhausted them all.
+				break
+			}
+		} else {
+			// Reset the dang attempts, we were successful
+			attemptedToIncrementImageSuffix = false
+			attemptedToIncrementMiddleNumber = false
+			idx++
 		}
-		idx++
+	}
+
+	if debugModeEnabled {
+		log.Println("Successfully downloaded all images 🥳")
 	}
 }
 

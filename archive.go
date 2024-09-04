@@ -94,9 +94,7 @@ func createDir(redfinUrl string) string {
 
 func extractHTML(redfinUrl string) string {
 	if debugModeEnabled {
-		println("hello")
 		log.Printf("Redfin URL = %s\n", redfinUrl)
-		println("RedfinUrl = " + redfinUrl)
 	}
 
 	// Set up request
@@ -206,7 +204,7 @@ func downloadImages(imageUrlPrefix string, imageUrlSuffix string, outputDir stri
 	}
 
 	if debugModeEnabled {
-		log.Println("Successfully downloaded all images 🥳")
+		log.Println("Download complete")
 	}
 }
 
@@ -225,6 +223,9 @@ func downloadFile(url string, fileName string) error {
 	}(resp.Body)
 
 	if resp.StatusCode != 200 {
+		if debugModeEnabled {
+			log.Printf("Failed to download image: %s failed with status code %d", url, resp.StatusCode)
+		}
 		return errors.New("image not successfully got")
 	}
 

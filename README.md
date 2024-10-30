@@ -20,6 +20,8 @@ Debug mode creates a `go-redfin-archiver.log` file, and spits out debug info to 
 1. `go run archive.go https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534 debug`
 2. `./go-redfin-archiver.exe https://www.redfin.com/CA/San-Jose/206-Grayson-Ter-95126/home/2122534 debug`
 
+*Note*: If you're seeing a 403 in debug mode for downloading *some* images, that's normal. The script has to guess at which file naming pattern Redfin chooses to follow for subsequent images. Instead of a 404 for images not existing, Redfin will return a 403. So, if you see sporatic 403s in debug mode, chances are those images never existed, and it's just the script trying to discover the file pattern used.
+
 ## Demo
 ![Demo download](./demo.gif)
 

@@ -64,7 +64,7 @@ func extractAddress(htmlText string) string {
 }
 
 func extractImageURLPrefixAndSuffix(htmlText string) (string, string) {
-	bigPhotoCDNPrefixPattern := `https://ssl\.cdn-redfin\.com/photo/\d+/bigphoto/\w+/[0-9A-Za-z]+`
+	bigPhotoCDNPrefixPattern := `https://ssl\.cdn-redfin\.com/photo/\d+/bigphoto/\w+/[0-9A-Za-z-]+`
 	bigPhotoCDNSuffixPattern := `_\d.jpg` // Can't guarantee only 1 number, so best to be safe and use a regex rather than indexing on a fully matched CDN URL.
 	prefixRegex := regexp.MustCompile(bigPhotoCDNPrefixPattern)
 	suffixRegex := regexp.MustCompile(bigPhotoCDNSuffixPattern)

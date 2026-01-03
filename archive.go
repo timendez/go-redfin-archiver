@@ -19,15 +19,19 @@ func main() {
 	redfinUrl := os.Args[1]
 	htmlText := extractHTML(redfinUrl)
 	address := extractAddress(htmlText)
-	imageUrlPrefix, imageUrlSuffix := extractImageURLPrefixAndSuffix(htmlText)
 	outputDir := createDir(address)
-	downloadedCount, downloadedUrls := downloadImages(imageUrlPrefix, imageUrlSuffix, outputDir)
-	if downloadedCount <= 1 {
+	htmlImageUrls := extractImageURLsFromHTML(htmlText)
+	downloadedUrls := make(map[string]bool)
+	downloadedCount := 0
+	if len(htmlImageUrls) > 0 {
+		downloadedCount = downloadImagesFromList(htmlImageUrls, outputDir, downloadedUrls, 0)
+	}
+	if downloadedCount == 0 {
 		if debugModeEnabled {
-			log.Println("Walker found 1 or fewer images; falling back to HTML image list")
+			log.Println("HTML image list empty or failed; falling back to walker")
 		}
-		htmlImageUrls := extractImageURLsFromHTML(htmlText)
-		downloadImagesFromList(htmlImageUrls, outputDir, downloadedUrls, downloadedCount)
+		imageUrlPrefix, imageUrlSuffix := extractImageURLPrefixAndSuffix(htmlText)
+		downloadImages(imageUrlPrefix, imageUrlSuffix, outputDir)
 	}
 }
 
@@ -242,8 +246,9 @@ func extractImageURLsFromHTML(htmlText string) []string {
 	return unique
 }
 
-func downloadImagesFromList(urls []string, outputDir string, downloadedUrls map[string]bool, startIndex int) {
+func downloadImagesFromList(urls []string, outputDir string, downloadedUrls map[string]bool, startIndex int) int {
 	imageIndex := startIndex
+	downloaded := 0
 	for _, url := range urls {
 		if downloadedUrls[url] {
 			continue
@@ -256,8 +261,10 @@ func downloadImagesFromList(urls []string, outputDir string, downloadedUrls map[
 		if err == nil {
 			downloadedUrls[url] = true
 			imageIndex++
+			downloaded++
 		}
 	}
+	return downloaded
 }
 
 // Modified from https://golangbyexample.com/download-image-file-url-golang/

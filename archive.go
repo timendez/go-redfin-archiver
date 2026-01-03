@@ -21,7 +21,14 @@ func main() {
 	address := extractAddress(htmlText)
 	imageUrlPrefix, imageUrlSuffix := extractImageURLPrefixAndSuffix(htmlText)
 	outputDir := createDir(address)
-	downloadImages(imageUrlPrefix, imageUrlSuffix, outputDir)
+	downloadedCount, downloadedUrls := downloadImages(imageUrlPrefix, imageUrlSuffix, outputDir)
+	if downloadedCount <= 1 {
+		if debugModeEnabled {
+			log.Println("Walker found 1 or fewer images; falling back to HTML image list")
+		}
+		htmlImageUrls := extractImageURLsFromHTML(htmlText)
+		downloadImagesFromList(htmlImageUrls, outputDir, downloadedUrls, downloadedCount)
+	}
 }
 
 func configureLogging() {
@@ -165,10 +172,12 @@ func incrementImageSuffix(imageUrlSuffix string) string {
 	return fmt.Sprintf("_%d.jpg", imageSuffixNumber+1)
 }
 
-func downloadImages(imageUrlPrefix string, imageUrlSuffix string, outputDir string) {
+func downloadImages(imageUrlPrefix string, imageUrlSuffix string, outputDir string) (int, map[string]bool) {
 	idx := 0
 	attemptedToIncrementImageSuffix := false
 	attemptedToIncrementMiddleNumber := false
+	downloadedUrls := make(map[string]bool)
+	downloadedCount := 0
 
 	for {
 		indexedString := func() string {
@@ -199,12 +208,55 @@ func downloadImages(imageUrlPrefix string, imageUrlSuffix string, outputDir stri
 			// Reset the dang attempts, we were successful
 			attemptedToIncrementImageSuffix = false
 			attemptedToIncrementMiddleNumber = false
+			downloadedUrls[url] = true
+			downloadedCount++
 			idx++
 		}
 	}
 
 	if debugModeEnabled {
 		log.Println("Download complete")
+	}
+	return downloadedCount, downloadedUrls
+}
+
+func extractImageURLsFromHTML(htmlText string) []string {
+	imagePattern := `https://ssl\.cdn-redfin\.com/photo/\d+/bigphoto/\w+/[0-9A-Za-z_.-]+\.jpg`
+	regex := regexp.MustCompile(imagePattern)
+	matches := regex.FindAllString(htmlText, -1)
+	if len(matches) == 0 {
+		if debugModeEnabled {
+			log.Println("No image URLs found in HTML for fallback")
+		}
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	unique := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if !seen[match] {
+			seen[match] = true
+			unique = append(unique, match)
+		}
+	}
+	return unique
+}
+
+func downloadImagesFromList(urls []string, outputDir string, downloadedUrls map[string]bool, startIndex int) {
+	imageIndex := startIndex
+	for _, url := range urls {
+		if downloadedUrls[url] {
+			continue
+		}
+		if debugModeEnabled {
+			log.Println("Downloading image of URL " + url)
+		}
+		fileName := fmt.Sprintf("%s/image%d.jpg", outputDir, imageIndex)
+		err := downloadFile(url, fileName)
+		if err == nil {
+			downloadedUrls[url] = true
+			imageIndex++
+		}
 	}
 }
 
